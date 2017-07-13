@@ -39,6 +39,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.Utils;
@@ -62,17 +63,20 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String FILENAME = (Environment.getExternalStorageDirectory().getPath()+"/result.jpg");
     private ImageView imageView;
+    private TextView textView;
+    private double bestMatch;
+    private int index = 0;
     Bitmap selectedImage;
-    Bitmap secondSelectedImage;
-    Mat matSelectedImage;
-    Mat secondMatSelectedImage;
+    CVTree firstImage;
+    CVTree secondImage;
     Mat finalImg;
     ProgressBar bar;
     private final int Pick_image = 1;
-    private final int Pick_second_image = 2;
     Uri imageUri;
     private Button process;
+    private Button pickImage;
     private int PERMISSION_REQUEST_CODE = 2;
+    final static DataBaseHelper dataBaseHelper = new DataBaseHelper();
 
 
 
@@ -80,17 +84,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-        System.out.println(FILENAME);
-
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         bar = (ProgressBar) findViewById(R.id.verify_progress);
         bar.setVisibility(View.INVISIBLE);
+        textView = (TextView) findViewById(R.id.textView);
+        textView.setVisibility(View.INVISIBLE);
         imageView = (ImageView) findViewById(R.id.imageView);
-        final Button PickImage = (Button) findViewById(R.id.button);
+        pickImage = (Button) findViewById(R.id.button);
 
-
-        PickImage.setOnClickListener(new View.OnClickListener() {
+        pickImage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 requestMultiplePermissions();
@@ -99,22 +102,9 @@ public class MainActivity extends AppCompatActivity {
                     Intent photoPickerIntent = new Intent(Intent.ACTION_PICK);
                     photoPickerIntent.setType("image/*");
                     startActivityForResult(photoPickerIntent, Pick_image);
-                    startActivityForResult(photoPickerIntent, Pick_second_image);
                 }
             }
         });
-
-
-        try {
-            AssetManager am = MainActivity.this.getAssets();
-            InputStream stream =  am.open("kek.jpg");
-            Bitmap bitmap = BitmapFactory.decodeStream(stream);
-            imageView.setImageBitmap(bitmap);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-
 
         process = (Button) findViewById(R.id.button2);
         process.setOnClickListener(new OnClickListener() {
@@ -122,71 +112,20 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 if (selectedImage != null) {
 
-                    selectedImage = scaleBitmap(selectedImage);
-                    secondSelectedImage = scaleBitmap(secondSelectedImage);
                     finalImg = new Mat(selectedImage.getHeight(), selectedImage.getWidth(), CvType.CV_8UC3, new Scalar(0, 0, 0));
-                    matSelectedImage = new Mat(selectedImage.getHeight(), selectedImage.getWidth(), CvType.CV_8UC3, new Scalar(0, 0, 0));
-                    secondMatSelectedImage = new Mat(secondSelectedImage.getHeight(), secondSelectedImage.getWidth(), CvType.CV_8UC3, new Scalar(0, 0, 0));
+
+                    firstImage = new CVTree();
+                    firstImage.setImageByBitmap(selectedImage);
 
 
-                    Utils.bitmapToMat(selectedImage, matSelectedImage);
-                    Imgproc.cvtColor(matSelectedImage, matSelectedImage, Imgproc.COLOR_RGB2GRAY);
-
-
-                    Utils.bitmapToMat(secondSelectedImage, secondMatSelectedImage);
-                    Imgproc.cvtColor(secondMatSelectedImage, secondMatSelectedImage, Imgproc.COLOR_RGB2GRAY);
-
-
-
-
-
-                    /**
-                     * Прогнать 2 image через CVTree и сравнить
-                     */
-                    int maximumNumberOfMatches = 40;
-
-                    CVTree firstImage = new CVTree();
-                    CVTree secondImage = new CVTree();
-
-                    firstImage.setImageByMat(matSelectedImage);
-                    secondImage.setImageByMat(secondMatSelectedImage);
-
-
-                    DescriptorMatcher matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-                    MatOfDMatch matches = new MatOfDMatch();
-                    matcher.match(secondImage.descriptors, firstImage.descriptors, matches);
-
-                    ArrayList<DMatch> goodMatches = new ArrayList<DMatch>();
-                    List<DMatch> allMatches = matches.toList();
-
-                    double minDist = 50;
-                    for (int i = 0; i < secondImage.descriptors.rows(); i++) {
-                        double dist = allMatches.get(i).distance;
-                        if (dist < minDist) minDist = dist;
-                    }
-                    for (int i = 0; i < secondImage.descriptors.rows() && goodMatches.size() < maximumNumberOfMatches; i++) {
-                        if (allMatches.get(i).distance <= 2 * minDist) {
-                            goodMatches.add(allMatches.get(i));
-                        }
-                    }
-                    MatOfDMatch goodEnough = new MatOfDMatch();
-                    goodEnough.fromList(goodMatches);
-
-                    Features2d.drawMatches(secondMatSelectedImage, secondImage.keyPoint, matSelectedImage, firstImage.keyPoint, goodEnough, finalImg, Scalar.all(-1), Scalar.all(-1), new MatOfByte(), Features2d.DRAW_RICH_KEYPOINTS + Features2d.NOT_DRAW_SINGLE_POINTS);
-
-                    Imgcodecs.imwrite(FILENAME, finalImg);
-                    finalImg = Imgcodecs.imread(FILENAME);
-
-                    TextView num = (TextView) findViewById(R.id.allMatches);
-                    num.setText(String.valueOf(allMatches.size()));
-                    num = (TextView) findViewById(R.id.goodMatches);
-                    num.setText(goodEnough.size().toString());
-                    NewThread thread = new NewThread();
-
-                    thread.execute();
+                    Comparison comparison = new Comparison();
+                    comparison.execute();
                 }
             }
         });
+
+        DataBaseLoad dataBaseLoad = new DataBaseLoad();
+        dataBaseLoad.execute();
 
 
 
@@ -208,41 +147,14 @@ public class MainActivity extends AppCompatActivity {
                     } catch (FileNotFoundException e) {
                         e.printStackTrace();
                     }
-                } break;
-            case Pick_second_image:
-                if(resultCode == RESULT_OK) {
-                    try {
-                        imageUri = imageReturnedIntent.getData();
-                        final InputStream imageStream = getContentResolver().openInputStream(imageUri);
-                        secondSelectedImage = BitmapFactory.decodeStream(imageStream);
-                        imageView.setImageBitmap(secondSelectedImage);
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
                 }
-                break;
-
         }
     }
 
 
-
-    private Bitmap scaleBitmap(Bitmap image){
-        int MAX_DIM = 600;
-        int width;
-        int height;
-        Bitmap scaledImage;
-        if (image.getWidth() >= image.getHeight()) {
-            width = MAX_DIM;
-            height = image.getHeight() * MAX_DIM / image.getWidth();
-        } else {
-            height = MAX_DIM;
-            width = image.getWidth() * MAX_DIM / image.getHeight();
-        }
-        scaledImage = Bitmap.createScaledBitmap(image, width, height, false);
-        return scaledImage;
-    }
-
+    /**
+     * Запрос разрешений от пользователя
+     */
     public void requestMultiplePermissions() {
         ActivityCompat.requestPermissions(this,
                 new String[] {
@@ -252,9 +164,9 @@ public class MainActivity extends AppCompatActivity {
                 PERMISSION_REQUEST_CODE);
     }
 
+
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == PERMISSION_REQUEST_CODE && grantResults.length == 2) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 System.out.println("permission have got");
@@ -266,31 +178,108 @@ public class MainActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    class NewThread extends AsyncTask<Void, Integer, Bitmap> {
+
+    /**
+     * Класс поток для загрузки БД
+     */
+    private class DataBaseLoad extends AsyncTask<Void, Void, Void>{
 
         @Override
-        protected Bitmap doInBackground(Void... params) {
-            Bitmap bitmap = null;
-            bitmap = BitmapFactory.decodeFile(FILENAME);
-
-            return bitmap;
+        protected Void doInBackground(Void... params) {
+            dataBaseHelper.fillList(MainActivity.this);
+            return null;
         }
 
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
             bar.setVisibility(View.VISIBLE);
+            pickImage.setVisibility(View.GONE);
+            process.setVisibility(View.GONE);
 
         }
 
         @Override
-        protected void onPostExecute(Bitmap result){
-            super.onPostExecute(result);
-            imageView.setImageBitmap(result);
+        protected void onPostExecute(Void result){
             bar.setVisibility(View.GONE);
+            pickImage.setVisibility(View.VISIBLE);
+            process.setVisibility(View.VISIBLE);
+        }
+    }
+
+    /**
+     * Класс поток для сравнения деревьев
+     */
+    private class Comparison extends AsyncTask<Void, Void, Void>{
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            int maximumNumberOfMatches = 500;
+            index = 0;
+            bestMatch = 0;
+
+            for (int i = 0; i < dataBaseHelper.getSize(); i++) {
+                secondImage = dataBaseHelper.get(i);
+                DescriptorMatcher matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+                MatOfDMatch matches = new MatOfDMatch();
+                matcher.match(secondImage.descriptors, firstImage.descriptors, matches);
+
+                ArrayList<DMatch> goodMatches = new ArrayList<DMatch>();
+                List<DMatch> allMatches = matches.toList();
+
+                double minDist = 90;
+                for (int j = 0; j < secondImage.descriptors.rows(); j++) {
+                    double dist = allMatches.get(j).distance;
+                    if (dist < minDist) minDist = dist;
+                }
+                for (int j = 0; j < secondImage.descriptors.rows() && goodMatches.size() < maximumNumberOfMatches; j++) {
+                    if (allMatches.get(j).distance <= 2 * minDist) {
+                        goodMatches.add(allMatches.get(j));
+                    }
+                }
+                MatOfDMatch goodEnough = new MatOfDMatch();
+                goodEnough.fromList(goodMatches);
+
+//                Features2d.drawMatches(secondImage.getImage(), secondImage.keyPoint, firstImage.getImage(), firstImage.keyPoint, goodEnough, finalImg, Scalar.all(-1), Scalar.all(-1), new MatOfByte(), Features2d.DRAW_RICH_KEYPOINTS + Features2d.NOT_DRAW_SINGLE_POINTS);
+
+
+
+                if (bestMatch <= (double)goodEnough.rows()/allMatches.size()){
+                    bestMatch = (double)goodEnough.rows()/allMatches.size();
+                    System.out.println(bestMatch);
+                    index = i;
+                }
+
+//                System.out.println(index);
+            }
+            return null;
         }
 
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            bar.setVisibility(View.VISIBLE);
+            pickImage.setVisibility(View.GONE);
+            process.setVisibility(View.GONE);
 
+        }
+
+        @Override
+        protected void onPostExecute(Void result){
+            bar.setVisibility(View.GONE);
+            pickImage.setVisibility(View.VISIBLE);
+            process.setVisibility(View.VISIBLE);
+            textView.setVisibility(View.VISIBLE);
+            AssetManager assets = MainActivity.this.getAssets();
+            try {
+                InputStream is = assets.open(dataBaseHelper.get(index).getPath());
+                imageView.setImageBitmap(BitmapFactory.decodeStream(is));
+                textView.setText("This is "+ dataBaseHelper.get(index).getName());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+        }
     }
 
 

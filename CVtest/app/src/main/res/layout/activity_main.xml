@@ -8,7 +8,7 @@
 
     <ProgressBar
         android:id="@+id/verify_progress"
-        style="@android:style/Widget.ProgressBar.Large"
+        style="@android:style/Widget.Holo.ProgressBar.Large"
         android:layout_width="44dp"
         android:layout_height="43dp"
         android:layout_marginBottom="8dp"
@@ -17,12 +17,12 @@
         android:layout_marginTop="0dp"
         android:indeterminate="false"
         app:layout_constraintBottom_toTopOf="@+id/button2"
+        app:layout_constraintHorizontal_bias="0.501"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintVertical_bias="0.68"
         app:layout_constraintTop_toBottomOf="@+id/button"
-        tools:layout_editor_absoluteY="419dp"
-        app:layout_constraintHorizontal_bias="0.501" />
+        app:layout_constraintVertical_bias="0.68"
+        tools:layout_editor_absoluteY="419dp" />
 
     <Button
         android:id="@+id/button"
@@ -74,37 +74,19 @@
         android:layout_marginEnd="8dp" />
 
     <TextView
-        android:id="@+id/allMatches"
+        android:id="@+id/textView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0"
-        android:layout_marginRight="8dp"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintLeft_toRightOf="@+id/button"
-        android:layout_marginLeft="8dp"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@+id/imageView"
-        app:layout_constraintBottom_toBottomOf="parent"
         android:layout_marginBottom="8dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp" />
-
-    <TextView
-        android:id="@+id/goodMatches"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0"
-        android:layout_marginTop="8dp"
-        app:layout_constraintTop_toBottomOf="@+id/allMatches"
-        app:layout_constraintBottom_toBottomOf="parent"
-        android:layout_marginBottom="8dp"
-        app:layout_constraintLeft_toRightOf="@+id/button2"
         android:layout_marginLeft="8dp"
         android:layout_marginRight="8dp"
+        android:layout_marginTop="8dp"
+        android:text="TextView"
+        android:textSize="24sp"
+        app:layout_constraintBottom_toTopOf="@+id/button"
+        app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintVertical_bias="0.109"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp" />
+        app:layout_constraintTop_toBottomOf="@+id/imageView" />
 
 
 </android.support.constraint.ConstraintLayout>
