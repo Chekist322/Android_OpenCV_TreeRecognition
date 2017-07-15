@@ -1,17 +1,9 @@
 package test.cvtest;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.res.AssetManager;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteOpenHelper;
-import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
-import org.opencv.core.Mat;
-
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -21,19 +13,21 @@ import java.util.List;
  * Created by Phoen on 09.07.2017.
  */
 
-public class DataBaseHelper{
+public class DataBaseHelper {
     private List<CVTree> treeList;
+    private List<CVLeaf> leafList;
 
-    DataBaseHelper(){
+    DataBaseHelper() {
+        leafList = new ArrayList<>();
         treeList = new ArrayList<>();
     }
 
 
-    private void add(CVTree tree){
-        treeList.add(tree);
+    private void add(CVLeaf tree) {
+        leafList.add(tree);
     }
 
-    public void fillList(Activity current){
+    public void fillList(Activity current) {
         try {
             AssetManager assets = current.getAssets();
             InputStream is;
@@ -41,17 +35,21 @@ public class DataBaseHelper{
             String outCursor;
             String inCursor;
 
-            for (int i = 0; i < folders.length-3; i++) {
+            for (int i = 0; i < folders.length; i++) {
                 outCursor = folders[i];
-                String[] images = assets.list(outCursor);
-                for (int j = 0; j < images.length; j++) {
-                    inCursor = images[j];
-                    is = assets.open(outCursor + "/" + inCursor);
-                    CVTree cvTree = new CVTree(outCursor + "/" + inCursor);
-                    cvTree.setName(outCursor);
-                    System.out.println(outCursor+" / "+inCursor);
-                    cvTree.setImageByBitmap(BitmapFactory.decodeStream(is));
-                    this.add(cvTree);
+                if (folders[i].matches(".+[А-Я].+")) {
+                    String[] images = assets.list(outCursor);
+                    for (int j = 0; j < images.length; j++) {
+                        if (images[j].matches(".+jpg")) {
+                            inCursor = images[j];
+                            is = assets.open(outCursor + "/" + inCursor);
+                            CVLeaf cvLeaf = new CVLeaf(outCursor + "/" + inCursor);
+                            cvLeaf.setName(outCursor);
+                            System.out.println(outCursor + " / " + inCursor);
+                            cvLeaf.setImageByBitmap(BitmapFactory.decodeStream(is));
+                            this.add(cvLeaf);
+                        }
+                    }
                 }
             }
 
@@ -61,11 +59,11 @@ public class DataBaseHelper{
     }
 
 
-    public CVTree get(int index){
-        return treeList.get(index);
+    public CVLeaf getLeaf(int index) {
+        return leafList.get(index);
     }
 
-    public int getSize(){
-        return treeList.size();
+    public int getSize() {
+        return leafList.size();
     }
 }
