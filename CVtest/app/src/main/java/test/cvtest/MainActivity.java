@@ -67,10 +67,16 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+        super.onCreate(savedInstanceState);
+        if(savedInstanceState != null){
+            String string = savedInstanceState.getString("key");
+        }
+
         FILE_NAME = getFilesDir().getAbsolutePath() + "/kek.jpg";
         System.out.println(FILE_NAME);
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-        super.onCreate(savedInstanceState);
+//        super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         bar = (ProgressBar) findViewById(R.id.verify_progress);
         bar.setVisibility(View.INVISIBLE);
@@ -351,6 +357,12 @@ public class MainActivity extends AppCompatActivity {
             }
 
         }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putString("key", "value");
     }
 
 }
