@@ -10,9 +10,11 @@
     <uses-feature android:name="android.hardware.camera.autofocus" />
 
     <application
+        android:debuggable="true"
         android:screenOrientation="portrait"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
+        android:label="Recognition9000"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity">
