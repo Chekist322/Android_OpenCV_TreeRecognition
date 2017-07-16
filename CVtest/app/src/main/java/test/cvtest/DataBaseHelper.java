@@ -15,16 +15,16 @@ import java.util.List;
 
 public class DataBaseHelper {
     private List<CVTree> treeList;
-    private List<CVLeaf> leafList;
+//    private List<CVLeaf> leafList;
 
     DataBaseHelper() {
-        leafList = new ArrayList<>();
+//        leafList = new ArrayList<>();
         treeList = new ArrayList<>();
     }
 
 
-    private void add(CVLeaf tree) {
-        leafList.add(tree);
+    private void add(CVTree tree) {
+        treeList.add(tree);
     }
 
     public void fillList(Activity current) {
@@ -38,6 +38,7 @@ public class DataBaseHelper {
             for (int i = 0; i < folders.length; i++) {
                 outCursor = folders[i];
                 if (folders[i].matches(".+[А-Я].+")) {
+                    CVTree cvTree = new CVTree(outCursor);
                     String[] images = assets.list(outCursor);
                     for (int j = 0; j < images.length; j++) {
                         if (images[j].matches(".+jpg")) {
@@ -47,9 +48,11 @@ public class DataBaseHelper {
                             cvLeaf.setName(outCursor);
                             System.out.println(outCursor + " / " + inCursor);
                             cvLeaf.setImageByBitmap(BitmapFactory.decodeStream(is));
-                            this.add(cvLeaf);
+                            cvTree.addLeaf(cvLeaf);
                         }
                     }
+
+                    this.add(cvTree);
                 }
             }
 
@@ -59,11 +62,11 @@ public class DataBaseHelper {
     }
 
 
-    public CVLeaf getLeaf(int index) {
-        return leafList.get(index);
+    public CVTree getTreeByIndex(int index) {
+        return treeList.get(index);
     }
 
     public int getSize() {
-        return leafList.size();
+        return treeList.size();
     }
 }

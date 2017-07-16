@@ -1,22 +1,17 @@
 package test.cvtest;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-
 import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -37,35 +32,43 @@ import org.opencv.core.DMatch;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfDMatch;
 import org.opencv.core.Scalar;
-import org.opencv.features2d.*;
+import org.opencv.features2d.DescriptorMatcher;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 
 import static android.Manifest.permission.CAMERA;
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 
 public class MainActivity extends AppCompatActivity {
 
-    private ImageView imageView;
-    private TextView textView;
-    private double bestMatch;
-    private int index = 0;
+    final static DataBaseHelper dataBaseHelper = new DataBaseHelper();
+    private final int PICK_IMAGE = 1;
+    private final int DIDNT_GET_PERMISSIONS = 3;
+    private final int CAMERA_RESULT = 4;
+    String FILE_NAME;
     Bitmap selectedImage;
     CVLeaf firstImage;
     CVLeaf secondImage;
+    CVTree currentTree;
     Mat finalImg;
     ProgressBar bar;
-    private final int PICK_IMAGE = 1;
     Uri imageUri;
+    private ImageView imageView;
+    private TextView textView;
+    private double bestMatch = 200;
+    private int index = -1;
     private Button process;
     private Button pickImage;
+    private Button takePicture;
     private int PERMISSION_REQUEST_CODE = 2;
-    private final int DIDNT_GET_PERMISSIONS = 3;
-    final static DataBaseHelper dataBaseHelper = new DataBaseHelper();
-
-
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        FILE_NAME = getFilesDir().getAbsolutePath() + "/kek.jpg";
+        System.out.println(FILE_NAME);
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
@@ -74,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
         textView = (TextView) findViewById(R.id.textView);
         textView.setVisibility(View.INVISIBLE);
         imageView = (ImageView) findViewById(R.id.imageView);
-        pickImage = (Button) findViewById(R.id.button);
+        pickImage = (Button) findViewById(R.id.galeryButton);
 
         pickImage.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -103,21 +106,33 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        takePicture = (Button) findViewById(R.id.cameraButton);
+        takePicture.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (ContextCompat.checkSelfPermission(MainActivity.this, CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                    startActivityForResult(cameraIntent, CAMERA_RESULT);
+                } else {
+                    requestMultiplePermissions();
+                }
+            }
+        });
+
         DataBaseLoad dataBaseLoad = new DataBaseLoad();
         dataBaseLoad.execute();
-
 
 
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent imageReturnedIntent){
+    protected void onActivityResult(int requestCode, int resultCode, Intent imageReturnedIntent) {
 
         super.onActivityResult(requestCode, resultCode, imageReturnedIntent);
 
-        switch (requestCode){
+        switch (requestCode) {
             case PICK_IMAGE:
-                if(resultCode == RESULT_OK){
+                if (resultCode == RESULT_OK) {
                     try {
                         imageUri = imageReturnedIntent.getData();
                         final InputStream imageStream = getContentResolver().openInputStream(imageUri);
@@ -131,6 +146,10 @@ public class MainActivity extends AppCompatActivity {
             case DIDNT_GET_PERMISSIONS:
                 requestApplicationConfig();
                 break;
+            case CAMERA_RESULT:
+                selectedImage = (Bitmap) imageReturnedIntent.getExtras().get("data");
+                imageView.setImageBitmap(selectedImage);
+                break;
         }
     }
 
@@ -141,7 +160,7 @@ public class MainActivity extends AppCompatActivity {
     public void requestMultiplePermissions() {
 
         ActivityCompat.requestPermissions(this,
-                new String[] {
+                new String[]{
                         READ_EXTERNAL_STORAGE,
                         Manifest.permission.CAMERA
                 },
@@ -154,123 +173,14 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == (PERMISSION_REQUEST_CODE) && grantResults.length == 2) {
             if ((grantResults[0] == PackageManager.PERMISSION_GRANTED) && (grantResults[1] == PackageManager.PERMISSION_GRANTED)) {
                 System.out.println("permission have got");
-            }else{
+            } else {
                 showPermissionDialog(MainActivity.this);
             }
 
-        }else {
+        } else {
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
     }
-
-
-    /**
-     * Класс поток для загрузки БД
-     */
-    private class DataBaseLoad extends AsyncTask<Void, Void, Void>{
-
-        @Override
-        protected Void doInBackground(Void... params) {
-            dataBaseHelper.fillList(MainActivity.this);
-            return null;
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            Toast toast = Toast.makeText(MainActivity.this, "Database loading...", Toast.LENGTH_SHORT);
-            toast.show();
-            bar.setVisibility(View.VISIBLE);
-            pickImage.setVisibility(View.GONE);
-            process.setVisibility(View.GONE);
-
-        }
-
-        @Override
-        protected void onPostExecute(Void result){
-            bar.setVisibility(View.GONE);
-            pickImage.setVisibility(View.VISIBLE);
-            process.setVisibility(View.VISIBLE);
-            Toast toast = Toast.makeText(MainActivity.this, "Success!", Toast.LENGTH_SHORT);
-            toast.show();
-        }
-    }
-
-    /**
-     * Класс поток для сравнения деревьев
-     */
-    private class Comparison extends AsyncTask<Void, Void, Void>{
-
-        @Override
-        protected Void doInBackground(Void... params) {
-            int maximumNumberOfMatches = 500;
-            index = 0;
-            bestMatch = 0;
-
-            for (int i = 0; i < dataBaseHelper.getSize(); i++) {
-                secondImage = dataBaseHelper.getLeaf(i);
-                DescriptorMatcher matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-                MatOfDMatch matches = new MatOfDMatch();
-                matcher.match(secondImage.descriptors, firstImage.descriptors, matches);
-
-                ArrayList<DMatch> goodMatches = new ArrayList<DMatch>();
-                List<DMatch> allMatches = matches.toList();
-
-                double minDist = 90;
-                for (int j = 0; j < secondImage.descriptors.rows(); j++) {
-                    double dist = allMatches.get(j).distance;
-                    if (dist < minDist) minDist = dist;
-                }
-                for (int j = 0; j < secondImage.descriptors.rows() && goodMatches.size() < maximumNumberOfMatches; j++) {
-                    if (allMatches.get(j).distance <= 2 * minDist) {
-                        goodMatches.add(allMatches.get(j));
-                    }
-                }
-                MatOfDMatch goodEnough = new MatOfDMatch();
-                goodEnough.fromList(goodMatches);
-
-//                Features2d.drawMatches(secondImage.getImage(), secondImage.keyPoint, firstImage.getImage(), firstImage.keyPoint, goodEnough, finalImg, Scalar.all(-1), Scalar.all(-1), new MatOfByte(), Features2d.DRAW_RICH_KEYPOINTS + Features2d.NOT_DRAW_SINGLE_POINTS);
-
-
-
-                if (bestMatch < goodEnough.rows()){
-                    bestMatch = goodEnough.rows();
-                    System.out.println(bestMatch);
-                    index = i;
-                }
-
-//                System.out.println(index);
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-            bar.setVisibility(View.VISIBLE);
-            pickImage.setVisibility(View.GONE);
-            process.setVisibility(View.GONE);
-
-        }
-
-        @Override
-        protected void onPostExecute(Void result){
-            bar.setVisibility(View.GONE);
-            pickImage.setVisibility(View.VISIBLE);
-            process.setVisibility(View.VISIBLE);
-            textView.setVisibility(View.VISIBLE);
-            AssetManager assets = MainActivity.this.getAssets();
-            try {
-                InputStream is = assets.open(dataBaseHelper.getLeaf(index).getPath());
-                imageView.setImageBitmap(BitmapFactory.decodeStream(is));
-                textView.setText("This is "+ dataBaseHelper.getLeaf(index).getName());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-        }
-    }
-
 
     private void showPermissionDialog(Context context) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
@@ -311,13 +221,135 @@ public class MainActivity extends AppCompatActivity {
         return permissionCheck == PackageManager.PERMISSION_GRANTED;
     }
 
-
     private void requestApplicationConfig() {
         if ((isPermissionGranted(READ_EXTERNAL_STORAGE)) && (isPermissionGranted(CAMERA))) {
             Toast.makeText(MainActivity.this, "Good job, comrade!", Toast.LENGTH_LONG).show();
         } else {
             Toast.makeText(MainActivity.this, "Don't be so shy!", Toast.LENGTH_LONG).show();
             requestMultiplePermissions();
+        }
+    }
+
+    /**
+     * Класс поток для загрузки БД
+     */
+    private class DataBaseLoad extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected Void doInBackground(Void... params) {
+            dataBaseHelper.fillList(MainActivity.this);
+            return null;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            Toast toast = Toast.makeText(MainActivity.this, "Database loading...", Toast.LENGTH_SHORT);
+            toast.show();
+            bar.setVisibility(View.VISIBLE);
+            takePicture.setVisibility(View.GONE);
+            pickImage.setVisibility(View.GONE);
+            process.setVisibility(View.GONE);
+
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+            bar.setVisibility(View.GONE);
+            takePicture.setVisibility(View.VISIBLE);
+            pickImage.setVisibility(View.VISIBLE);
+            process.setVisibility(View.VISIBLE);
+            Toast toast = Toast.makeText(MainActivity.this, "Success!", Toast.LENGTH_SHORT);
+            toast.show();
+
+
+        }
+    }
+
+    /**
+     * Класс поток для сравнения деревьев
+     */
+    private class Comparison extends AsyncTask<Void, Void, Void> {
+
+        @Override
+        protected Void doInBackground(Void... params) {
+
+            for (int i = 0; i < dataBaseHelper.getSize(); i++) {
+
+                currentTree = dataBaseHelper.getTreeByIndex(i);
+
+                for (int j = 0; j < currentTree.getSize(); j++) {
+                    secondImage = currentTree.getLeafByIndex(j);
+                    DescriptorMatcher matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
+                    MatOfDMatch matches = new MatOfDMatch();
+                    matcher.match(secondImage.descriptors, firstImage.descriptors, matches);
+
+
+                    List<DMatch> allMatches = matches.toList();
+
+
+                    for (int k = 0; k < secondImage.descriptors.rows(); k++) {
+
+                        secondImage.averageDistance += allMatches.get(k).distance;
+
+                    }
+                    secondImage.averageDistance /= allMatches.size();
+                    System.out.println(allMatches.size());
+
+
+                    System.out.print(dataBaseHelper.getTreeByIndex(i).getLeafByIndex(j).averageDistance);
+                    System.out.print("/");
+                    System.out.println(dataBaseHelper.getTreeByIndex(i).getLeafByIndex(j).getName());
+
+                }
+                currentTree.countAverage();
+
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            bar.setVisibility(View.VISIBLE);
+            takePicture.setVisibility(View.GONE);
+            pickImage.setVisibility(View.GONE);
+            process.setVisibility(View.GONE);
+
+        }
+
+        @Override
+        protected void onPostExecute(Void result) {
+            bar.setVisibility(View.GONE);
+            takePicture.setVisibility(View.VISIBLE);
+            pickImage.setVisibility(View.VISIBLE);
+            process.setVisibility(View.VISIBLE);
+
+            AssetManager assets = MainActivity.this.getAssets();
+            try {
+                for (int i = 0; i < dataBaseHelper.getSize(); i++) {
+                    if (bestMatch > dataBaseHelper.getTreeByIndex(i).averageDistance) {
+                        bestMatch = dataBaseHelper.getTreeByIndex(i).averageDistance;
+                        index = i;
+                        System.out.println(bestMatch);
+                    }
+                }
+                if (index == -1) {
+                    textView.setVisibility(View.GONE);
+                    Toast.makeText(MainActivity.this, "Take another picture.", Toast.LENGTH_LONG).show();
+                } else {
+                    textView.setVisibility(View.VISIBLE);
+                    InputStream is = assets.open(dataBaseHelper.getTreeByIndex(index).getLeafByIndex(0).getPath());
+                    imageView.setImageBitmap(BitmapFactory.decodeStream(is));
+                    textView.setText("This is " + dataBaseHelper.getTreeByIndex(index).getName());
+//                    System.out.println(bestMatch);
+                    bestMatch = 200;
+                    index = -1;
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
         }
     }
 
