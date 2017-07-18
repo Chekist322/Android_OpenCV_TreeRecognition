@@ -1,6 +1,10 @@
 [
     {
-        "outputFile": "E:\\Andrusha\\Android_OpenCV_TreeRecognition\\CVtest\\openCVLibrary3\\build\\intermediates\\incremental\\mergeDebugAndroidTestResources\\merged.dir\\values\\values.xml",
+        "outputFile": "/home/tosya/Desktop/Andrusha/Android_OpenCV_TreeRecognition/CVtest/openCVLibrary3/build/intermediates/incremental/mergeDebugAndroidTestResources/merged.dir/values/values.xml",
+        "map": []
+    },
+    {
+        "outputFile": "/home/tosya/Desktop/Andrusha/Android_OpenCV_TreeRecognition/CVtest/E:\\Andrusha\\Android_OpenCV_TreeRecognition\\CVtest\\openCVLibrary3\\build\\intermediates\\incremental\\mergeDebugAndroidTestResources\\merged.dir\\values\\values.xml",
         "map": []
     }
 ]
